@@ -1,0 +1,7 @@
+#!/usr/bin/env xdg-open
+[Desktop Entry]
+Name=smsappclient
+Exec=/home/tom/Dropbox/bin/smsappclient
+Type=Application
+Icon=smsappclient
+

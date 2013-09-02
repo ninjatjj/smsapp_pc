@@ -1,0 +1,9 @@
+.classpath
+.project
+.settings
+target
+connection*.txt
+contacts.properties
+*.log
+*~
+smsappclient_pc-*.txt

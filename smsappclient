@@ -1,0 +1,4 @@
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd $DIR
+jps | grep SmsApplicationClient | cut -f1 -d ' ' | xargs kill -9 > /dev/null 2>&1
+mvn compile exec:exec -e >> "$SMSAPPCLIENT_PC_LOG_FOLDER"smsappclient_pc-`date +%Y%m%d%H%M%S`.txt 2>&1
