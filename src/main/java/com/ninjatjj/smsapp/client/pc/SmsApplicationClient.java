@@ -34,14 +34,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
-import java.util.Vector;
 
-import javax.bluetooth.DeviceClass;
-import javax.bluetooth.DiscoveryAgent;
-import javax.bluetooth.DiscoveryListener;
-import javax.bluetooth.LocalDevice;
-import javax.bluetooth.RemoteDevice;
-import javax.bluetooth.ServiceRecord;
 import javax.imageio.ImageIO;
 import javax.jmdns.JmDNS;
 import javax.jmdns.ServiceEvent;
@@ -312,12 +305,6 @@ public class SmsApplicationClient extends JFrame implements
 		return myClient;
 	}
 
-	public synchronized void setRemoteDevice(RemoteDevice remoteDevice,
-			String uuid) {
-		myClient.setRemoteDevice(remoteDevice, uuid);
-		myClient.reconnect();
-	}
-
 	private void clearNewMessageNotification() {
 		if (hasUnread(conversationActivity.getAddress())) {
 			try {
@@ -473,7 +460,6 @@ public class SmsApplicationClient extends JFrame implements
 
 		// DiscoveryListener listener = new MyDiscoveryListener();
 		// boolean connectionDetailsRequired = true;
-		boolean wireless = false;
 		String remoteDeviceName = null;
 		String port = null;
 		String uuid = null;
@@ -483,7 +469,7 @@ public class SmsApplicationClient extends JFrame implements
 			BufferedReader fileReader = new BufferedReader(
 					new InputStreamReader(
 							new FileInputStream(connectionDetails)));
-			wireless = fileReader.readLine().startsWith("w");
+			boolean wireless = fileReader.readLine().startsWith("w");
 			remoteDeviceName = fileReader.readLine();
 			if (wireless) {
 				port = fileReader.readLine();
@@ -493,238 +479,112 @@ public class SmsApplicationClient extends JFrame implements
 		}
 
 		if (!connectionDetails.exists()) {
+
+			InetAddress wifiAddress = null;
+			for (Enumeration<NetworkInterface> en = NetworkInterface
+					.getNetworkInterfaces(); en.hasMoreElements();) {
+				NetworkInterface intf = en.nextElement();
+				for (Enumeration<InetAddress> enumIpAddr = intf
+						.getInetAddresses(); enumIpAddr.hasMoreElements();) {
+					InetAddress inetAddress = enumIpAddr.nextElement();
+					if (!inetAddress.isLoopbackAddress()) {
+						if (inetAddress instanceof Inet4Address) {
+							wifiAddress = inetAddress;
+						}
+					}
+				}
+			}
+
+			String type = "_workstation._tcp.local.";
+			final JmDNS jmdns = JmDNS.create(wifiAddress);
+			ServiceListener listener;
+			jmdns.addServiceListener(type, listener = new ServiceListener() {
+				public void serviceResolved(ServiceEvent ev) {
+					System.out.println("Service resolved: "
+							+ ev.getInfo().getQualifiedName() + " ip address: "
+							+ ev.getInfo().getInetAddresses()[0]);
+				}
+
+				public void serviceRemoved(ServiceEvent ev) {
+					System.out.println("Service removed: " + ev.getName());
+				}
+
+				public void serviceAdded(ServiceEvent event) {
+					// Required to force serviceResolved to be
+					// called again
+					// (after the first search)
+					jmdns.requestServiceInfo(event.getType(), event.getName(),
+							1);
+				}
+			});
+
+			// System.out.println(new Date() + " Waiting for 10 seconds");
+			// synchronized (jmdns) {
+			// jmdns.wait(10000);
+			// }
+			jmdns.removeServiceListener(type, listener);
+			jmdns.close();
+
+			// System.out.println("List of possible servers:");
+			// // File file = new File("/proc/net/arp");
+			// // int length = (int) file.length();
+			// //
+			// // FileReader reader = new FileReader(file);
+			// // char[] filecontent = new char[length];
+			// // for (int offset = 0; offset < length;) {
+			// // offset += reader.read(filecontent, offset, length -
+			// offset);
+			// // }
+			// ProcessBuilder pb = new ProcessBuilder("cat",
+			// "/proc/net/arp");
+			// Process start = pb.start();
+			// BufferedReader reader = new BufferedReader(
+			// new InputStreamReader(start.getErrorStream()));
+			// while (true) {
+			// if (1 != 1) {
+			// break;
+			// }
+			// reader.readLine();
+			// }
+			//
+			//
+			// reader.close();
+			// System.out.println("List complete");
+
 			System.out
-					.println("Do you want to connect using bluetooth or wireless (w for wireless)?");
-			wireless = bReader.readLine().startsWith("w");
+					.println("Enter the remote address (press enter for default of 192.168.43.1)");
+			remoteDeviceName = bReader.readLine();
+			System.out
+					.println("Enter the remote port (press enter for default of 8765)");
+			port = bReader.readLine();
+
+			System.out
+					.println("Enter a unique name for the server to identify you by (enter for a default)");
+			uuid = bReader.readLine();
+
 		}
-		if (wireless) {
-			if (!connectionDetails.exists()) {
-
-				InetAddress wifiAddress = null;
-				for (Enumeration<NetworkInterface> en = NetworkInterface
-						.getNetworkInterfaces(); en.hasMoreElements();) {
-					NetworkInterface intf = en.nextElement();
-					for (Enumeration<InetAddress> enumIpAddr = intf
-							.getInetAddresses(); enumIpAddr.hasMoreElements();) {
-						InetAddress inetAddress = enumIpAddr.nextElement();
-						if (!inetAddress.isLoopbackAddress()) {
-							if (inetAddress instanceof Inet4Address) {
-								wifiAddress = inetAddress;
-							}
-						}
-					}
-				}
-
-				String type = "_workstation._tcp.local.";
-				final JmDNS jmdns = JmDNS.create(wifiAddress);
-				ServiceListener listener;
-				jmdns.addServiceListener(type,
-						listener = new ServiceListener() {
-							public void serviceResolved(ServiceEvent ev) {
-								System.out.println("Service resolved: "
-										+ ev.getInfo().getQualifiedName()
-										+ " ip address: "
-										+ ev.getInfo().getInetAddresses()[0]);
-							}
-
-							public void serviceRemoved(ServiceEvent ev) {
-								System.out.println("Service removed: "
-										+ ev.getName());
-							}
-
-							public void serviceAdded(ServiceEvent event) {
-								// Required to force serviceResolved to be
-								// called again
-								// (after the first search)
-								jmdns.requestServiceInfo(event.getType(),
-										event.getName(), 1);
-							}
-						});
-
-				// System.out.println(new Date() + " Waiting for 10 seconds");
-				// synchronized (jmdns) {
-				// jmdns.wait(10000);
-				// }
-				jmdns.removeServiceListener(type, listener);
-				jmdns.close();
-
-				// System.out.println("List of possible servers:");
-				// // File file = new File("/proc/net/arp");
-				// // int length = (int) file.length();
-				// //
-				// // FileReader reader = new FileReader(file);
-				// // char[] filecontent = new char[length];
-				// // for (int offset = 0; offset < length;) {
-				// // offset += reader.read(filecontent, offset, length -
-				// offset);
-				// // }
-				// ProcessBuilder pb = new ProcessBuilder("cat",
-				// "/proc/net/arp");
-				// Process start = pb.start();
-				// BufferedReader reader = new BufferedReader(
-				// new InputStreamReader(start.getErrorStream()));
-				// while (true) {
-				// if (1 != 1) {
-				// break;
-				// }
-				// reader.readLine();
-				// }
-				//
-				//
-				// reader.close();
-				// System.out.println("List complete");
-
-				System.out
-						.println("Enter the remote address (press enter for default of 192.168.43.1)");
-				remoteDeviceName = bReader.readLine();
-				System.out
-						.println("Enter the remote port (press enter for default of 8765)");
-				port = bReader.readLine();
-
-				System.out
-						.println("Enter a unique name for the server to identify you by (enter for a default)");
-				uuid = bReader.readLine();
-
-			}
-			if (remoteDeviceName.length() == 0) {
-				remoteDeviceName = "192.168.43.1";
-			}
-			if (port.length() == 0) {
-				port = "8765";
-			}
-			if (uuid.length() == 0) {
-				uuid = UUID.randomUUID().toString();
-			}
-
-			if (!connectionDetails.exists()) {
-				connectionDetails.createNewFile();
-				FileWriter fw = new FileWriter(connectionDetails);
-				fw.append("w" + "\n");
-				fw.append(remoteDeviceName + "\n");
-				fw.append(port + "\n");
-				fw.append(uuid + "\n");
-				fw.close();
-			}
-
-			smsApplicationClient.getClient().setSocketConnectionDetails(
-					remoteDeviceName, port, uuid);
-		} else {
-
-			LocalDevice localDevice = LocalDevice.getLocalDevice();
-			System.out.println("Address: " + localDevice.getBluetoothAddress());
-			System.out.println("Name: " + localDevice.getFriendlyName());
-
-			RemoteDevice remoteDevice = null;
-			DiscoveryAgent agent = localDevice.getDiscoveryAgent();
-
-			// final Object lock = new Object();
-			// final Vector<RemoteDevice> devices = new Vector<RemoteDevice>();
-
-			// DiscoveryListener listener = new MyDiscoveryListener();
-			if (remoteDeviceName != null) {
-				class MyRemoteDevice extends RemoteDevice {
-					public MyRemoteDevice(String address) {
-						super(address);
-					}
-				}
-				remoteDevice = new MyRemoteDevice(remoteDeviceName);
-			} else {
-				Vector<RemoteDevice> devices = new Vector<RemoteDevice>();
-				System.out.println("Starting device inquiry...");
-				Object lock = new Object();
-				class MyDiscoveryListener implements DiscoveryListener {
-					private Vector<RemoteDevice> devices;
-					private Object lock;
-
-					public MyDiscoveryListener(Vector<RemoteDevice> devices,
-							Object lock) {
-						this.devices = devices;
-						this.lock = lock;
-					}
-
-					public void deviceDiscovered(RemoteDevice remoteDevice,
-							DeviceClass deviceClass) {
-						if (!devices.contains(remoteDevice)) {
-							devices.addElement(remoteDevice);
-						}
-					}
-
-					public void servicesDiscovered(int transID,
-							ServiceRecord[] servRecord) {
-					}
-
-					public void serviceSearchCompleted(int transID, int respCode) {
-						synchronized (lock) {
-							lock.notify();
-						}
-					}
-
-					public void inquiryCompleted(int discType) {
-						synchronized (lock) {
-							lock.notify();
-						}
-
-					}
-				}
-				agent.startInquiry(DiscoveryAgent.GIAC,
-						new MyDiscoveryListener(devices, lock));
-
-				try {
-					synchronized (lock) {
-						lock.wait();
-					}
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
-
-				System.out.println("Device Inquiry Completed. ");
-
-				int deviceCount = devices.size();
-
-				if (deviceCount <= 0) {
-					System.out.println("No Devices Found .");
-					System.exit(0);
-				} else {
-					System.out.println("Bluetooth Devices: ");
-					for (int i = 0; i < deviceCount; i++) {
-						RemoteDevice found = (RemoteDevice) devices
-								.elementAt(i);
-						String addr = found.getBluetoothAddress();
-						String friendly = "protected";
-						try {
-							friendly = found.getFriendlyName(true);
-						} catch (IOException e) {
-							e.printStackTrace();
-						}
-						System.out.println((i + 1) + ". " + addr + " ("
-								+ friendly + ")");
-					}
-				}
-
-				System.out.print("Choose Device index: ");
-
-				String chosenIndex = bReader.readLine();
-				int index = Integer.parseInt(chosenIndex.trim());
-
-				remoteDevice = (RemoteDevice) devices.elementAt(index - 1);
-
-				System.out
-						.println("Enter a unique name for the server to identify you by (enter for a default)");
-				uuid = bReader.readLine();
-
-				if (uuid.length() == 0) {
-					uuid = UUID.randomUUID().toString();
-				}
-
-				connectionDetails.createNewFile();
-				FileWriter fw = new FileWriter(connectionDetails);
-				fw.append("b" + "\n");
-				fw.append(remoteDevice.getBluetoothAddress() + " \n");
-				fw.append(uuid + "\n");
-				fw.close();
-			}
-			smsApplicationClient.setRemoteDevice(remoteDevice, uuid);
+		if (remoteDeviceName.length() == 0) {
+			remoteDeviceName = "192.168.43.1";
 		}
+		if (port.length() == 0) {
+			port = "8765";
+		}
+		if (uuid.length() == 0) {
+			uuid = UUID.randomUUID().toString();
+		}
+
+		if (!connectionDetails.exists()) {
+			connectionDetails.createNewFile();
+			FileWriter fw = new FileWriter(connectionDetails);
+			fw.append("w" + "\n");
+			fw.append(remoteDeviceName + "\n");
+			fw.append(port + "\n");
+			fw.append(uuid + "\n");
+			fw.close();
+		}
+
+		smsApplicationClient.getClient().setSocketConnectionDetails(
+				remoteDeviceName, port, uuid);
 	}
 
 	@Override
